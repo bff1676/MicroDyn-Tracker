@@ -1,0 +1,144 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>MicroDyn MA Release Tracker</title>
+  <link rel="stylesheet" href="/styles.css">
+</head>
+<body>
+  <header class="app-header">
+    <div>
+      <p class="eyebrow">MicroDyn Medicare Advantage</p>
+      <h1>Release Tracker</h1>
+    </div>
+    <nav class="tabs" aria-label="Views">
+      <button class="tab active" data-view="dashboard">Dashboard</button>
+      <button class="tab" data-view="release">Release</button>
+      <button class="tab" data-view="reports">Reports</button>
+      <button class="tab" data-view="settings">Claim Types</button>
+    </nav>
+  </header>
+
+  <main>
+    <section id="dashboard" class="view active">
+      <div class="toolbar">
+        <label class="search">
+          <span>Search</span>
+          <input id="searchInput" type="search" placeholder="Claim, component, version, status">
+        </label>
+        <label>
+          <span>Status</span>
+          <select id="statusFilter">
+            <option value="">All statuses</option>
+          </select>
+        </label>
+      </div>
+      <div id="summary" class="summary"></div>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Claim Type</th>
+              <th>Component</th>
+              <th>Version</th>
+              <th>Status</th>
+              <th>Last Update</th>
+              <th>Announce</th>
+              <th>Dev Deploy</th>
+              <th>Dev Complete</th>
+              <th>PPMO Deploy</th>
+              <th>PPMO Complete</th>
+              <th>PROD Deploy</th>
+              <th>PROD Complete</th>
+              <th>Docs</th>
+            </tr>
+          </thead>
+          <tbody id="trackerBody"></tbody>
+        </table>
+      </div>
+    </section>
+
+    <section id="release" class="view">
+      <form id="releaseForm" class="panel">
+        <div class="panel-title">
+          <h2>Update Release</h2>
+          <button type="submit" class="primary">Save</button>
+        </div>
+        <div class="form-grid">
+          <label>
+            <span>Component</span>
+            <select id="componentId" required></select>
+          </label>
+          <label>
+            <span>Version</span>
+            <input id="version" required placeholder="Example: 2026.2.0">
+          </label>
+          <label>
+            <span>Status</span>
+            <select id="status" required></select>
+          </label>
+          <label><span>Announce date</span><input id="announceDate" type="date"></label>
+          <label><span>Dev deploy date</span><input id="devDeployDate" type="date"></label>
+          <label><span>Dev complete date</span><input id="devCompleteDate" type="date"></label>
+          <label><span>PPMO deploy date</span><input id="ppmoDeployDate" type="date"></label>
+          <label><span>PPMO complete date</span><input id="ppmoCompleteDate" type="date"></label>
+          <label><span>PROD deploy date</span><input id="prodDeployDate" type="date"></label>
+          <label><span>PROD complete date</span><input id="prodCompleteDate" type="date"></label>
+          <label class="wide">
+            <span>Release notes</span>
+            <textarea id="releaseNotes" rows="4"></textarea>
+          </label>
+        </div>
+      </form>
+
+      <form id="attachmentForm" class="panel">
+        <div class="panel-title">
+          <h2>Attach Document</h2>
+          <button type="submit">Upload</button>
+        </div>
+        <div class="form-grid">
+          <label>
+            <span>Release</span>
+            <select id="attachmentReleaseId" required></select>
+          </label>
+          <label>
+            <span>Document</span>
+            <input id="attachmentFile" type="file" required>
+          </label>
+          <label class="wide">
+            <span>Description</span>
+            <input id="attachmentDescription" placeholder="Implementation memo, CMS notice, test evidence">
+          </label>
+        </div>
+      </form>
+      <div id="attachmentsPanel" class="panel"></div>
+    </section>
+
+    <section id="reports" class="view">
+      <div class="report-actions">
+        <a class="button primary" href="/api/reports/releases.csv">Export CSV</a>
+        <a class="button" href="/api/reports/releases.json">Export JSON</a>
+        <button id="printReport">Print Report</button>
+      </div>
+      <div id="reportContent" class="report"></div>
+    </section>
+
+    <section id="settings" class="view">
+      <div class="panel">
+        <div class="panel-title">
+          <h2>Claim Type Setup</h2>
+        </div>
+      <div id="claimTypeList" class="claim-list"></div>
+      <div class="panel-title section-title">
+        <h2>Component Availability</h2>
+      </div>
+      <div id="componentList" class="component-list"></div>
+      </div>
+    </section>
+  </main>
+
+  <div id="toast" role="status"></div>
+  <script src="/app.js"></script>
+</body>
+</html>

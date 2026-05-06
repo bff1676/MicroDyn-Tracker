@@ -1,0 +1,13 @@
+{
+  "name": "microdyn-ma-release-tracker",
+  "version": "1.0.0",
+  "description": "SQLite-backed tracker for MicroDyn Medicare Advantage claim module releases.",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "init-db": "node server.js --init-db"
+  },
+  "engines": {
+    "node": ">=24"
+  }
+}

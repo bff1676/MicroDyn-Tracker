@@ -59,6 +59,10 @@ function migrateDb(database) {
       UPDATE claim_components SET last_update_date = datetime('now') WHERE id = NEW.claim_component_id;
     END;
 
+    CREATE UNIQUE INDEX IF NOT EXISTS idx_releases_component_announce_date
+      ON releases(claim_component_id, announce_date)
+      WHERE announce_date IS NOT NULL;
+
     UPDATE claim_components
     SET is_active = 0
     WHERE component_type_id = (SELECT id FROM component_types WHERE name = 'Grouper')
@@ -153,23 +157,9 @@ const statements = {
   attachmentById: db.prepare('SELECT * FROM attachments WHERE id = ?'),
   releaseById: db.prepare('SELECT id FROM releases WHERE id = ?'),
   componentById: db.prepare('SELECT id FROM claim_components WHERE id = ?'),
-  upsertRelease: db.prepare(`
-    INSERT INTO releases (
-      claim_component_id, version, status, announce_date, dev_deploy_date, dev_complete_date,
-      ppmo_deploy_date, ppmo_complete_date, prod_deploy_date, prod_complete_date, release_notes
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-    ON CONFLICT(claim_component_id, version) DO UPDATE SET
-      status = excluded.status,
-      announce_date = excluded.announce_date,
-      dev_deploy_date = excluded.dev_deploy_date,
-      dev_complete_date = excluded.dev_complete_date,
-      ppmo_deploy_date = excluded.ppmo_deploy_date,
-      ppmo_complete_date = excluded.ppmo_complete_date,
-      prod_deploy_date = excluded.prod_deploy_date,
-      prod_complete_date = excluded.prod_complete_date,
-      release_notes = excluded.release_notes
-    RETURNING id
-  `),
+  releaseByComponentAnnounceDate: db.prepare('SELECT id FROM releases WHERE claim_component_id = ? AND announce_date = ?'),
+  insertRelease: db.prepare('INSERT INTO releases (claim_component_id, version, status, announce_date, dev_deploy_date, dev_complete_date, ppmo_deploy_date, ppmo_complete_date, prod_deploy_date, prod_complete_date, release_notes) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) RETURNING id'),
+  updateRelease: db.prepare('UPDATE releases SET claim_component_id = ?, version = ?, status = ?, announce_date = ?, dev_deploy_date = ?, dev_complete_date = ?, ppmo_deploy_date = ?, ppmo_complete_date = ?, prod_deploy_date = ?, prod_complete_date = ?, release_notes = ? WHERE id = ? RETURNING id'),
   insertAttachment: db.prepare('INSERT INTO attachments (release_id, original_name, stored_name, mime_type, size_bytes, description) VALUES (?, ?, ?, ?, ?, ?)'),
   updateClaimType: db.prepare('UPDATE claim_types SET name = ?, description = ?, pricer_only = ? WHERE id = ?'),
   updateComponent: db.prepare('UPDATE claim_components SET is_active = ? WHERE id = ?')
@@ -215,6 +205,23 @@ function releasePayload(body) {
     cleanDate(body.prodCompleteDate),
     body.releaseNotes ? String(body.releaseNotes) : null
   ];
+}
+
+function saveRelease(body) {
+  const payload = releasePayload(body);
+  const explicitId = Number(body.id || body.releaseId || 0);
+  if (explicitId) {
+    if (!statements.releaseById.get(explicitId)) throw new Error('Release not found.');
+    return statements.updateRelease.get(...payload, explicitId);
+  }
+
+  const componentId = payload[0];
+  const announceDate = payload[3];
+  if (!announceDate) throw new Error('Announce date is required because it defines the release.');
+
+  const existing = statements.releaseByComponentAnnounceDate.get(componentId, announceDate);
+  if (existing) return statements.updateRelease.get(...payload, existing.id);
+  return statements.insertRelease.get(...payload);
 }
 
 function parseMultipart(buffer, contentType) {
@@ -271,8 +278,8 @@ async function handleApi(req, res) {
 
   if (req.method === 'POST' && url.pathname === '/api/releases') {
     const body = parseJson(await readBody(req));
-    if (!body.componentId || !String(body.version || '').trim()) return send(res, 400, { error: 'Component and version are required.' });
-    const result = statements.upsertRelease.get(...releasePayload(body));
+    if (!body.componentId || !String(body.version || '').trim() || !body.announceDate) return send(res, 400, { error: 'Component, version, and announce date are required.' });
+    const result = saveRelease(body);
     return send(res, 200, { id: result.id });
   }
 

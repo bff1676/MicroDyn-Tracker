@@ -55,6 +55,9 @@ CREATE TABLE IF NOT EXISTS attachments (
 );
 
 CREATE INDEX IF NOT EXISTS idx_releases_component ON releases(claim_component_id);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_releases_component_announce_date
+  ON releases(claim_component_id, announce_date)
+  WHERE announce_date IS NOT NULL;
 CREATE INDEX IF NOT EXISTS idx_releases_status ON releases(status);
 CREATE INDEX IF NOT EXISTS idx_attachments_release ON attachments(release_id);
 

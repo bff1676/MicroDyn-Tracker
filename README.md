@@ -39,6 +39,10 @@ Outpatient Grouper and ESRD Grouper are automatically marked inactive when the a
 
 Each component has a system-maintained last update date. The app updates this field automatically whenever a release is inserted or edited for that component.
 
+## Editing Releases
+
+The Announce Date defines a release for each component. If you save a component update with the same Announce Date later, the app updates that existing release record instead of creating a duplicate. You can also use the Release tab's Load Existing Release field to pull a saved row back into the form and edit it directly.
+
 ## Installation Package
 
 Build a portable package with:

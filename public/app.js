@@ -86,7 +86,8 @@ function fillSelects() {
   $('#statusFilter').innerHTML = '<option value="">All statuses</option>' + statuses.map(status => `<option>${status}</option>`).join('');
   $('#status').innerHTML = statuses.map(status => `<option>${status}</option>`).join('');
   $('#componentId').innerHTML = state.tracker.map(row => `<option value="${row.componentId}">${escapeHtml(row.claimType)} - ${escapeHtml(row.componentType)}</option>`).join('');
-  $('#attachmentReleaseId').innerHTML = state.releases.map(row => `<option value="${row.id}">${escapeHtml(row.claimType)} - ${escapeHtml(row.componentType)} - ${escapeHtml(row.version)}</option>`).join('');
+  $('#releaseId').innerHTML = '<option value="">New release update</option>' + state.releases.map(row => `<option value="${row.id}">${escapeHtml(row.announceDate || 'No announce date')} - ${escapeHtml(row.claimType)} - ${escapeHtml(row.componentType)} - ${escapeHtml(row.version)}</option>`).join('');
+  $('#attachmentReleaseId').innerHTML = state.releases.map(row => `<option value="${row.id}">${escapeHtml(row.announceDate || 'No announce date')} - ${escapeHtml(row.claimType)} - ${escapeHtml(row.componentType)} - ${escapeHtml(row.version)}</option>`).join('');
 }
 
 function renderReports() {
@@ -175,9 +176,24 @@ $('#statusFilter').addEventListener('change', renderTracker);
 $('#printReport').addEventListener('click', () => window.print());
 $('#attachmentReleaseId').addEventListener('change', renderAttachments);
 
+$('#releaseId').addEventListener('change', () => {
+  const release = state.releases.find(row => String(row.id) === $('#releaseId').value);
+  if (!release) {
+    $('#releaseForm').reset();
+    $('#releaseId').value = '';
+    return;
+  }
+  $('#componentId').value = release.componentId;
+  $('#version').value = release.version || '';
+  $('#status').value = release.status || 'Planned';
+  $('#releaseNotes').value = release.releaseNotes || '';
+  dateFields.forEach(field => document.getElementById(field).value = release[field] || '');
+});
+
 $('#releaseForm').addEventListener('submit', async event => {
   event.preventDefault();
   const body = {
+    id: $('#releaseId').value,
     componentId: $('#componentId').value,
     version: $('#version').value,
     status: $('#status').value,

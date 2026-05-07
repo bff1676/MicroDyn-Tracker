@@ -158,6 +158,7 @@ const statements = {
   releaseById: db.prepare('SELECT id FROM releases WHERE id = ?'),
   releaseDetailsById: db.prepare('SELECT * FROM releases WHERE id = ?'),
   releasesByAnnounceDate: db.prepare('SELECT id FROM releases WHERE announce_date = ?'),
+  statusByAnnounceDate: db.prepare('SELECT status FROM releases WHERE announce_date = ? ORDER BY updated_at DESC, id DESC LIMIT 1'),
   attachmentsByAnnounceDate: db.prepare(`
     SELECT a.stored_name AS storedName
     FROM attachments a
@@ -168,6 +169,7 @@ const statements = {
   releaseByComponentAnnounceDate: db.prepare('SELECT * FROM releases WHERE claim_component_id = ? AND announce_date = ?'),
   insertRelease: db.prepare('INSERT INTO releases (claim_component_id, version, status, announce_date, dev_deploy_date, dev_complete_date, ppmo_deploy_date, ppmo_complete_date, prod_deploy_date, prod_complete_date, release_notes) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) RETURNING id'),
   updateRelease: db.prepare('UPDATE releases SET claim_component_id = ?, version = ?, status = ?, announce_date = ?, dev_deploy_date = ?, dev_complete_date = ?, ppmo_deploy_date = ?, ppmo_complete_date = ?, prod_deploy_date = ?, prod_complete_date = ?, release_notes = ? WHERE id = ? RETURNING id'),
+  updateStatusByAnnounceDate: db.prepare('UPDATE releases SET status = ? WHERE announce_date = ?'),
   deleteReleasesByAnnounceDate: db.prepare('DELETE FROM releases WHERE announce_date = ?'),
   insertAttachment: db.prepare('INSERT INTO attachments (release_id, original_name, stored_name, mime_type, size_bytes, description) VALUES (?, ?, ?, ?, ?, ?)'),
   updateClaimType: db.prepare('UPDATE claim_types SET name = ?, description = ?, pricer_only = ? WHERE id = ?'),
@@ -207,11 +209,11 @@ function cleanText(value, existingValue = null) {
   return text || existingValue;
 }
 
-function releasePayload(body, existing = null) {
+function releasePayload(body, existing = null, dateStatus = null) {
   return [
     Number(body.componentId),
     cleanText(body.version, existing?.version),
-    body.status || existing?.status || 'Planned',
+    body.status || existing?.status || dateStatus || 'Planned',
     cleanDate(body.announceDate, existing?.announce_date),
     cleanDate(body.devDeployDate, existing?.dev_deploy_date),
     cleanDate(body.devCompleteDate, existing?.dev_complete_date),
@@ -224,13 +226,18 @@ function releasePayload(body, existing = null) {
 }
 
 function saveRelease(body) {
+  const submittedStatus = cleanText(body.status);
   const explicitId = Number(body.id || body.releaseId || 0);
   if (explicitId) {
     const existing = statements.releaseDetailsById.get(explicitId);
     if (!existing) throw new Error('Release not found.');
-    const payload = releasePayload(body, existing);
+    const announceDate = cleanDate(body.announceDate, existing.announce_date);
+    const dateStatus = statements.statusByAnnounceDate.get(announceDate)?.status;
+    const payload = releasePayload(body, existing, dateStatus);
     if (!payload[1]) throw new Error('Version is required for a new release.');
-    return statements.updateRelease.get(...payload, explicitId);
+    const result = statements.updateRelease.get(...payload, explicitId);
+    if (submittedStatus) statements.updateStatusByAnnounceDate.run(submittedStatus, payload[3]);
+    return result;
   }
 
   const componentId = Number(body.componentId);
@@ -238,10 +245,12 @@ function saveRelease(body) {
   if (!announceDate) throw new Error('Announce date is required because it defines the release.');
 
   const existing = statements.releaseByComponentAnnounceDate.get(componentId, announceDate);
-  const payload = releasePayload(body, existing);
+  const dateStatus = statements.statusByAnnounceDate.get(announceDate)?.status;
+  const payload = releasePayload(body, existing, dateStatus);
   if (!payload[1]) throw new Error('Version is required for a new release.');
-  if (existing) return statements.updateRelease.get(...payload, existing.id);
-  return statements.insertRelease.get(...payload);
+  const result = existing ? statements.updateRelease.get(...payload, existing.id) : statements.insertRelease.get(...payload);
+  if (submittedStatus) statements.updateStatusByAnnounceDate.run(submittedStatus, announceDate);
+  return result;
 }
 
 function deleteReleaseDate(announceDate) {

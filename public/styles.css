@@ -70,6 +70,7 @@ button, .button {
 
 button:hover, .button:hover { border-color: var(--focus); }
 .primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+.danger { background: #a73636; border-color: #a73636; color: #fff; }
 .tab.active { background: #e8f1ef; border-color: #a9c8c1; color: #164b42; font-weight: 700; }
 
 .view { display: none; }
@@ -169,6 +170,11 @@ tr:last-child td { border-bottom: 0; }
   border-radius: 8px;
   padding: 18px;
   margin-bottom: 18px;
+}
+
+.danger-panel {
+  border-color: #e2b6b6;
+  background: #fffafa;
 }
 
 .panel-title {

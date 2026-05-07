@@ -43,6 +43,10 @@ Each component has a system-maintained last update date. The app updates this fi
 
 The Announce Date defines a release for each component. If you save a component update with the same Announce Date later, the app updates that existing release record instead of creating a duplicate. Blank fields retain the previously saved values for that component and Announce Date, so adding a later milestone does not wipe out version, Dev, PPMO, PROD, notes, or status values. You can also use the Release tab's Load Existing Release field, or pick the same component and Announce Date, to pull a saved row back into the form and edit it directly.
 
+## Deleting Releases
+
+Use the Release tab's Delete Release Date section to remove every component release for a selected Announce Date. This deletes the release rows for that date and their attachment records; uploaded attachment files for those releases are removed from `uploads/` when present.
+
 ## Installation Package
 
 Build a portable package with:

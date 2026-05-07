@@ -157,10 +157,18 @@ const statements = {
   attachmentById: db.prepare('SELECT * FROM attachments WHERE id = ?'),
   releaseById: db.prepare('SELECT id FROM releases WHERE id = ?'),
   releaseDetailsById: db.prepare('SELECT * FROM releases WHERE id = ?'),
+  releasesByAnnounceDate: db.prepare('SELECT id FROM releases WHERE announce_date = ?'),
+  attachmentsByAnnounceDate: db.prepare(`
+    SELECT a.stored_name AS storedName
+    FROM attachments a
+    JOIN releases r ON r.id = a.release_id
+    WHERE r.announce_date = ?
+  `),
   componentById: db.prepare('SELECT id FROM claim_components WHERE id = ?'),
   releaseByComponentAnnounceDate: db.prepare('SELECT * FROM releases WHERE claim_component_id = ? AND announce_date = ?'),
   insertRelease: db.prepare('INSERT INTO releases (claim_component_id, version, status, announce_date, dev_deploy_date, dev_complete_date, ppmo_deploy_date, ppmo_complete_date, prod_deploy_date, prod_complete_date, release_notes) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) RETURNING id'),
   updateRelease: db.prepare('UPDATE releases SET claim_component_id = ?, version = ?, status = ?, announce_date = ?, dev_deploy_date = ?, dev_complete_date = ?, ppmo_deploy_date = ?, ppmo_complete_date = ?, prod_deploy_date = ?, prod_complete_date = ?, release_notes = ? WHERE id = ? RETURNING id'),
+  deleteReleasesByAnnounceDate: db.prepare('DELETE FROM releases WHERE announce_date = ?'),
   insertAttachment: db.prepare('INSERT INTO attachments (release_id, original_name, stored_name, mime_type, size_bytes, description) VALUES (?, ?, ?, ?, ?, ?)'),
   updateClaimType: db.prepare('UPDATE claim_types SET name = ?, description = ?, pricer_only = ? WHERE id = ?'),
   updateComponent: db.prepare('UPDATE claim_components SET is_active = ? WHERE id = ?')
@@ -236,6 +244,19 @@ function saveRelease(body) {
   return statements.insertRelease.get(...payload);
 }
 
+function deleteReleaseDate(announceDate) {
+  const releases = statements.releasesByAnnounceDate.all(announceDate);
+  const attachments = statements.attachmentsByAnnounceDate.all(announceDate);
+  const result = statements.deleteReleasesByAnnounceDate.run(announceDate);
+
+  for (const attachment of attachments) {
+    const filePath = path.join(UPLOAD_DIR, attachment.storedName);
+    if (fs.existsSync(filePath)) fs.unlinkSync(filePath);
+  }
+
+  return { deletedReleases: result.changes, deletedAttachments: attachments.length, matchedReleases: releases.length };
+}
+
 function parseMultipart(buffer, contentType) {
   const match = /boundary=(?:"([^"]+)"|([^;]+))/i.exec(contentType || '');
   if (!match) throw new Error('Missing multipart boundary.');
@@ -293,6 +314,12 @@ async function handleApi(req, res) {
     if (!body.componentId || !body.announceDate) return send(res, 400, { error: 'Component and announce date are required.' });
     const result = saveRelease(body);
     return send(res, 200, { id: result.id });
+  }
+
+  if (req.method === 'DELETE' && url.pathname === '/api/releases/by-announce-date') {
+    const announceDate = url.searchParams.get('announceDate');
+    if (!announceDate) return send(res, 400, { error: 'Announce date is required.' });
+    return send(res, 200, deleteReleaseDate(announceDate));
   }
 
   if (req.method === 'PUT' && url.pathname.startsWith('/api/claim-types/')) {

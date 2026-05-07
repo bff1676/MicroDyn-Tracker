@@ -83,11 +83,16 @@ function renderTracker() {
 }
 
 function fillSelects() {
+  const announceDates = [...new Set(state.releases.map(row => row.announceDate).filter(Boolean))].sort().reverse();
   $('#statusFilter').innerHTML = '<option value="">All statuses</option>' + statuses.map(status => `<option>${status}</option>`).join('');
   $('#status').innerHTML = statuses.map(status => `<option>${status}</option>`).join('');
   $('#componentId').innerHTML = state.tracker.map(row => `<option value="${row.componentId}">${escapeHtml(row.claimType)} - ${escapeHtml(row.componentType)}</option>`).join('');
   $('#releaseId').innerHTML = '<option value="">New release update</option>' + state.releases.map(row => `<option value="${row.id}">${escapeHtml(row.announceDate || 'No announce date')} - ${escapeHtml(row.claimType)} - ${escapeHtml(row.componentType)} - ${escapeHtml(row.version)}</option>`).join('');
   $('#attachmentReleaseId').innerHTML = state.releases.map(row => `<option value="${row.id}">${escapeHtml(row.announceDate || 'No announce date')} - ${escapeHtml(row.claimType)} - ${escapeHtml(row.componentType)} - ${escapeHtml(row.version)}</option>`).join('');
+  $('#deleteAnnounceDate').innerHTML = announceDates.map(date => {
+    const count = state.releases.filter(row => row.announceDate === date).length;
+    return `<option value="${date}">${date} - ${count} component${count === 1 ? '' : 's'}</option>`;
+  }).join('');
 }
 
 function renderReports() {
@@ -271,6 +276,19 @@ $('#componentList').addEventListener('submit', async event => {
     body: JSON.stringify({ isActive: form.isActive.checked })
   });
   toast('Component availability saved.');
+  await loadAll();
+});
+
+$('#deleteReleaseDateForm').addEventListener('submit', async event => {
+  event.preventDefault();
+  const announceDate = $('#deleteAnnounceDate').value;
+  if (!announceDate) return;
+  const count = state.releases.filter(row => row.announceDate === announceDate).length;
+  const confirmed = window.confirm(`Delete ${count} release component record${count === 1 ? '' : 's'} for Announce Date ${announceDate}? This also removes document attachment records for those releases.`);
+  if (!confirmed) return;
+  const result = await api(`/api/releases/by-announce-date?announceDate=${encodeURIComponent(announceDate)}`, { method: 'DELETE' });
+  toast(`Deleted ${result.deletedReleases} release record${result.deletedReleases === 1 ? '' : 's'}.`);
+  $('#releaseForm').reset();
   await loadAll();
 });
 

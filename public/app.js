@@ -14,7 +14,8 @@ const state = {
   tracker: [],
   releases: [],
   claimTypes: [],
-  components: []
+  components: [],
+  reportAnnounceDate: ''
 };
 
 const $ = selector => document.querySelector(selector);
@@ -84,11 +85,18 @@ function renderTracker() {
 
 function fillSelects() {
   const announceDates = [...new Set(state.releases.map(row => row.announceDate).filter(Boolean))].sort().reverse();
+  const selectedReportDate = announceDates.includes(state.reportAnnounceDate) ? state.reportAnnounceDate : '';
   $('#statusFilter').innerHTML = '<option value="">All statuses</option>' + statuses.map(status => `<option>${status}</option>`).join('');
   $('#status').innerHTML = statuses.map(status => `<option>${status}</option>`).join('');
   $('#componentId').innerHTML = state.tracker.map(row => `<option value="${row.componentId}">${escapeHtml(row.claimType)} - ${escapeHtml(row.componentType)}</option>`).join('');
   $('#releaseId').innerHTML = '<option value="">New release update</option>' + state.releases.map(row => `<option value="${row.id}">${escapeHtml(row.announceDate || 'No announce date')} - ${escapeHtml(row.claimType)} - ${escapeHtml(row.componentType)} - ${escapeHtml(row.version)}</option>`).join('');
   $('#attachmentReleaseId').innerHTML = state.releases.map(row => `<option value="${row.id}">${escapeHtml(row.announceDate || 'No announce date')} - ${escapeHtml(row.claimType)} - ${escapeHtml(row.componentType)} - ${escapeHtml(row.version)}</option>`).join('');
+  $('#reportAnnounceDate').innerHTML = '<option value="">All releases</option>' + announceDates.map(date => {
+    const count = state.releases.filter(row => row.announceDate === date).length;
+    return `<option value="${date}">${date} - ${count} component${count === 1 ? '' : 's'}</option>`;
+  }).join('');
+  $('#reportAnnounceDate').value = selectedReportDate;
+  state.reportAnnounceDate = selectedReportDate;
   $('#deleteAnnounceDate').innerHTML = announceDates.map(date => {
     const count = state.releases.filter(row => row.announceDate === date).length;
     return `<option value="${date}">${date} - ${count} component${count === 1 ? '' : 's'}</option>`;
@@ -96,9 +104,13 @@ function fillSelects() {
 }
 
 function renderReports() {
-  const rows = state.releases;
+  const rows = state.reportAnnounceDate ? state.releases.filter(row => row.announceDate === state.reportAnnounceDate) : state.releases;
+  const reportTitle = state.reportAnnounceDate ? `Release Report - ${escapeHtml(state.reportAnnounceDate)}` : 'Release Report - All Releases';
+  const query = state.reportAnnounceDate ? `?announceDate=${encodeURIComponent(state.reportAnnounceDate)}` : '';
+  $('#exportCsv').href = `/api/reports/releases.csv${query}`;
+  $('#exportJson').href = `/api/reports/releases.json${query}`;
   $('#reportContent').innerHTML = `
-    <h2>Release Report</h2>
+    <h2>${reportTitle}</h2>
     <p class="muted">Generated ${new Date().toLocaleString()}</p>
     <div class="table-wrap">
       <table>
@@ -203,6 +215,10 @@ document.querySelectorAll('.tab').forEach(tab => {
 $('#searchInput').addEventListener('input', renderTracker);
 $('#statusFilter').addEventListener('change', renderTracker);
 $('#printReport').addEventListener('click', () => window.print());
+$('#reportAnnounceDate').addEventListener('change', () => {
+  state.reportAnnounceDate = $('#reportAnnounceDate').value;
+  renderReports();
+});
 $('#attachmentReleaseId').addEventListener('change', renderAttachments);
 $('#componentId').addEventListener('change', syncReleaseByComponentDate);
 $('#announceDate').addEventListener('change', syncReleaseByComponentDate);

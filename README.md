@@ -25,6 +25,8 @@ The Reports tab supports browser printing plus:
 - CSV export: `/api/reports/releases.csv`
 - JSON export: `/api/reports/releases.json`
 
+Use the Reports tab's Release selector to report on all releases or one Announce Date. CSV and JSON exports use the same selection. You can also pass `?announceDate=YYYY-MM-DD` to either export endpoint.
+
 ## Attachments
 
 Uploaded documents are stored in `uploads/`. Attachment metadata is stored in SQLite and linked to a release.

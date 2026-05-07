@@ -136,8 +136,14 @@
 
     <section id="reports" class="view">
       <div class="report-actions">
-        <a class="button primary" href="/api/reports/releases.csv">Export CSV</a>
-        <a class="button" href="/api/reports/releases.json">Export JSON</a>
+        <label>
+          <span>Release</span>
+          <select id="reportAnnounceDate">
+            <option value="">All releases</option>
+          </select>
+        </label>
+        <a id="exportCsv" class="button primary" href="/api/reports/releases.csv">Export CSV</a>
+        <a id="exportJson" class="button" href="/api/reports/releases.json">Export JSON</a>
         <button id="printReport">Print Report</button>
       </div>
       <div id="reportContent" class="report"></div>

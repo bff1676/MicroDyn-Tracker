@@ -306,8 +306,9 @@ function csvValue(value) {
   return /[",\n]/.test(text) ? `"${text.replaceAll('"', '""')}"` : text;
 }
 
-function reportRows() {
-  return statements.releases.all();
+function reportRows(announceDate = '') {
+  const rows = statements.releases.all();
+  return announceDate ? rows.filter(row => row.announceDate === announceDate) : rows;
 }
 
 async function handleApi(req, res) {
@@ -390,13 +391,18 @@ async function handleApi(req, res) {
   }
 
   if (req.method === 'GET' && url.pathname === '/api/reports/releases.csv') {
-    const rows = reportRows();
+    const announceDate = url.searchParams.get('announceDate') || '';
+    const rows = reportRows(announceDate);
     const columns = ['claimType', 'componentType', 'version', 'status', 'lastUpdateDate', 'announceDate', 'devDeployDate', 'devCompleteDate', 'ppmoDeployDate', 'ppmoCompleteDate', 'prodDeployDate', 'prodCompleteDate', 'attachmentCount', 'releaseNotes'];
     const csv = [columns.join(','), ...rows.map(row => columns.map(col => csvValue(row[col])).join(','))].join('\n');
-    return send(res, 200, csv, { 'Content-Type': 'text/csv; charset=utf-8', 'Content-Disposition': 'attachment; filename="microdyn-release-report.csv"' });
+    const suffix = announceDate ? `-${announceDate}` : '';
+    return send(res, 200, csv, { 'Content-Type': 'text/csv; charset=utf-8', 'Content-Disposition': `attachment; filename="microdyn-release-report${suffix}.csv"` });
   }
 
-  if (req.method === 'GET' && url.pathname === '/api/reports/releases.json') return send(res, 200, { generatedAt: new Date().toISOString(), items: reportRows() });
+  if (req.method === 'GET' && url.pathname === '/api/reports/releases.json') {
+    const announceDate = url.searchParams.get('announceDate') || '';
+    return send(res, 200, { generatedAt: new Date().toISOString(), announceDate: announceDate || null, items: reportRows(announceDate) });
+  }
 
   send(res, 404, { error: 'API route not found.' });
 }

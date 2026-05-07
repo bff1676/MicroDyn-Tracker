@@ -117,6 +117,30 @@ function renderComponents() {
   `).join('');
 }
 
+function loadReleaseIntoForm(release) {
+  $('#releaseId').value = release.id;
+  $('#componentId').value = release.componentId;
+  $('#version').value = release.version || '';
+  $('#status').value = release.status || 'Planned';
+  $('#releaseNotes').value = release.releaseNotes || '';
+  dateFields.forEach(field => document.getElementById(field).value = release[field] || '');
+}
+
+function syncReleaseByComponentDate() {
+  const componentId = $('#componentId').value;
+  const announceDate = $('#announceDate').value;
+  if (!componentId || !announceDate) return;
+  const release = state.releases.find(row => String(row.componentId) === String(componentId) && row.announceDate === announceDate);
+  if (release) {
+    if ($('#releaseId').value !== String(release.id)) {
+      loadReleaseIntoForm(release);
+      toast('Existing release values loaded.');
+    }
+    return;
+  }
+  if ($('#releaseId').value) $('#releaseId').value = '';
+}
+
 function renderClaimTypes() {
   $('#claimTypeList').innerHTML = state.claimTypes.map(row => `
     <form class="claim-row" data-id="${row.id}">
@@ -175,6 +199,8 @@ $('#searchInput').addEventListener('input', renderTracker);
 $('#statusFilter').addEventListener('change', renderTracker);
 $('#printReport').addEventListener('click', () => window.print());
 $('#attachmentReleaseId').addEventListener('change', renderAttachments);
+$('#componentId').addEventListener('change', syncReleaseByComponentDate);
+$('#announceDate').addEventListener('change', syncReleaseByComponentDate);
 
 $('#releaseId').addEventListener('change', () => {
   const release = state.releases.find(row => String(row.id) === $('#releaseId').value);
@@ -183,11 +209,7 @@ $('#releaseId').addEventListener('change', () => {
     $('#releaseId').value = '';
     return;
   }
-  $('#componentId').value = release.componentId;
-  $('#version').value = release.version || '';
-  $('#status').value = release.status || 'Planned';
-  $('#releaseNotes').value = release.releaseNotes || '';
-  dateFields.forEach(field => document.getElementById(field).value = release[field] || '');
+  loadReleaseIntoForm(release);
 });
 
 $('#releaseForm').addEventListener('submit', async event => {

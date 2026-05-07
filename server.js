@@ -156,8 +156,9 @@ const statements = {
   attachmentsByRelease: db.prepare('SELECT id, original_name AS originalName, mime_type AS mimeType, size_bytes AS sizeBytes, description, uploaded_at AS uploadedAt FROM attachments WHERE release_id = ? ORDER BY uploaded_at DESC'),
   attachmentById: db.prepare('SELECT * FROM attachments WHERE id = ?'),
   releaseById: db.prepare('SELECT id FROM releases WHERE id = ?'),
+  releaseDetailsById: db.prepare('SELECT * FROM releases WHERE id = ?'),
   componentById: db.prepare('SELECT id FROM claim_components WHERE id = ?'),
-  releaseByComponentAnnounceDate: db.prepare('SELECT id FROM releases WHERE claim_component_id = ? AND announce_date = ?'),
+  releaseByComponentAnnounceDate: db.prepare('SELECT * FROM releases WHERE claim_component_id = ? AND announce_date = ?'),
   insertRelease: db.prepare('INSERT INTO releases (claim_component_id, version, status, announce_date, dev_deploy_date, dev_complete_date, ppmo_deploy_date, ppmo_complete_date, prod_deploy_date, prod_complete_date, release_notes) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) RETURNING id'),
   updateRelease: db.prepare('UPDATE releases SET claim_component_id = ?, version = ?, status = ?, announce_date = ?, dev_deploy_date = ?, dev_complete_date = ?, ppmo_deploy_date = ?, ppmo_complete_date = ?, prod_deploy_date = ?, prod_complete_date = ?, release_notes = ? WHERE id = ? RETURNING id'),
   insertAttachment: db.prepare('INSERT INTO attachments (release_id, original_name, stored_name, mime_type, size_bytes, description) VALUES (?, ?, ?, ?, ?, ?)'),
@@ -187,39 +188,50 @@ function parseJson(buffer) {
   return buffer.length ? JSON.parse(buffer.toString('utf8')) : {};
 }
 
-function cleanDate(value) {
+function cleanDate(value, existingValue = null) {
+  if (value === undefined || value === '') return existingValue;
   return value ? String(value) : null;
 }
 
-function releasePayload(body) {
+function cleanText(value, existingValue = null) {
+  if (value === undefined || value === '') return existingValue;
+  const text = String(value).trim();
+  return text || existingValue;
+}
+
+function releasePayload(body, existing = null) {
   return [
     Number(body.componentId),
-    String(body.version || '').trim(),
-    body.status || 'Planned',
-    cleanDate(body.announceDate),
-    cleanDate(body.devDeployDate),
-    cleanDate(body.devCompleteDate),
-    cleanDate(body.ppmoDeployDate),
-    cleanDate(body.ppmoCompleteDate),
-    cleanDate(body.prodDeployDate),
-    cleanDate(body.prodCompleteDate),
-    body.releaseNotes ? String(body.releaseNotes) : null
+    cleanText(body.version, existing?.version),
+    body.status || existing?.status || 'Planned',
+    cleanDate(body.announceDate, existing?.announce_date),
+    cleanDate(body.devDeployDate, existing?.dev_deploy_date),
+    cleanDate(body.devCompleteDate, existing?.dev_complete_date),
+    cleanDate(body.ppmoDeployDate, existing?.ppmo_deploy_date),
+    cleanDate(body.ppmoCompleteDate, existing?.ppmo_complete_date),
+    cleanDate(body.prodDeployDate, existing?.prod_deploy_date),
+    cleanDate(body.prodCompleteDate, existing?.prod_complete_date),
+    cleanText(body.releaseNotes, existing?.release_notes)
   ];
 }
 
 function saveRelease(body) {
-  const payload = releasePayload(body);
   const explicitId = Number(body.id || body.releaseId || 0);
   if (explicitId) {
-    if (!statements.releaseById.get(explicitId)) throw new Error('Release not found.');
+    const existing = statements.releaseDetailsById.get(explicitId);
+    if (!existing) throw new Error('Release not found.');
+    const payload = releasePayload(body, existing);
+    if (!payload[1]) throw new Error('Version is required for a new release.');
     return statements.updateRelease.get(...payload, explicitId);
   }
 
-  const componentId = payload[0];
-  const announceDate = payload[3];
+  const componentId = Number(body.componentId);
+  const announceDate = cleanDate(body.announceDate);
   if (!announceDate) throw new Error('Announce date is required because it defines the release.');
 
   const existing = statements.releaseByComponentAnnounceDate.get(componentId, announceDate);
+  const payload = releasePayload(body, existing);
+  if (!payload[1]) throw new Error('Version is required for a new release.');
   if (existing) return statements.updateRelease.get(...payload, existing.id);
   return statements.insertRelease.get(...payload);
 }
@@ -278,7 +290,7 @@ async function handleApi(req, res) {
 
   if (req.method === 'POST' && url.pathname === '/api/releases') {
     const body = parseJson(await readBody(req));
-    if (!body.componentId || !String(body.version || '').trim() || !body.announceDate) return send(res, 400, { error: 'Component, version, and announce date are required.' });
+    if (!body.componentId || !body.announceDate) return send(res, 400, { error: 'Component and announce date are required.' });
     const result = saveRelease(body);
     return send(res, 200, { id: result.id });
   }
